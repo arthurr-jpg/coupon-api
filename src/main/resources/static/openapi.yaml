@@ -1,0 +1,194 @@
+openapi: 3.0.1
+info:
+  title: Coupon API
+  description: API para cadastro, consulta e remoção (soft delete) de cupons.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local
+tags:
+  - name: coupon
+paths:
+  /coupon:
+    post:
+      tags: [coupon]
+      summary: /coupon
+      description: >-
+        Cria um cupom. Caracteres especiais do código são removidos antes de salvar;
+        o resultado deve ter exatamente 6 caracteres alfanuméricos.
+      operationId: createCoupon
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponRequest'
+            example:
+              code: ABC-123
+              description: 10% de desconto na primeira compra
+              discountValue: 0.8
+              expirationDate: '2030-11-04T17:14:45.180Z'
+              published: false
+      responses:
+        '201':
+          description: Sucesso
+          headers:
+            Location:
+              description: URL do cupom criado
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CouponResponse'
+              example:
+                id: cef9d1e3-aae5-4ab6-a297-358c6032b1e7
+                code: ABC123
+                description: 10% de desconto na primeira compra
+                discountValue: 0.8
+                expirationDate: '2030-11-04T17:14:45.180Z'
+                status: ACTIVE
+                published: false
+                redeemed: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /coupon/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Id do cupom (UUID)
+        schema:
+          type: string
+          format: uuid
+        example: cef9d1e3-aae5-4ab6-a297-358c6032b1e7
+    get:
+      tags: [coupon]
+      summary: /coupon/{id}
+      description: Busca um cupom pelo id. Cupons deletados continuam acessíveis, com status DELETED.
+      operationId: findCouponById
+      responses:
+        '200':
+          description: Sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CouponResponse'
+              example:
+                id: cef9d1e3-aae5-4ab6-a297-358c6032b1e7
+                code: ABC123
+                description: 10% de desconto na primeira compra
+                discountValue: 0.8
+                expirationDate: '2030-11-04T17:14:45.180Z'
+                status: ACTIVE
+                published: true
+                redeemed: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [coupon]
+      summary: /coupon/{id}
+      description: >-
+        Soft delete: marca o cupom como DELETED e preserva os dados do cadastro.
+        Não é possível deletar um cupom já deletado.
+      operationId: deleteCoupon
+      responses:
+        '204':
+          description: Sucesso (sem corpo)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cupom já deletado (ou alterado por outra requisição ao mesmo tempo)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  schemas:
+    CouponRequest:
+      type: object
+      required: [code, description, discountValue, expirationDate]
+      properties:
+        code:
+          type: string
+          description: Caracteres especiais são removidos; devem restar 6 alfanuméricos.
+          example: ABC-123
+        description:
+          type: string
+        discountValue:
+          type: number
+          minimum: 0.5
+          example: 0.8
+        expirationDate:
+          type: string
+          format: date-time
+          description: Não pode estar no passado.
+          example: '2030-11-04T17:14:45.180Z'
+        published:
+          type: boolean
+          default: false
+    CouponResponse:
+      type: object
+      required: [id, code, description, discountValue, expirationDate, status, published, redeemed]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: type UUID
+        code:
+          type: string
+          example: ABC123
+        description:
+          type: string
+        discountValue:
+          type: number
+          example: 0.8
+        expirationDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, DELETED]
+        published:
+          type: boolean
+          default: false
+        redeemed:
+          type: boolean
+          default: false
+    Problem:
+      type: object
+      description: Erro no formato RFC 7807
+      properties:
+        type:
+          type: string
+          example: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: Presente nos erros de validação de campos obrigatórios
+  responses:
+    BadRequest:
+      description: Dados inválidos, regra de negócio violada ou id fora do formato UUID
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Cupom não encontrado
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
