@@ -1,0 +1,6 @@
+services:
+  coupon-api:
+    build: .
+    container_name: coupon-api
+    ports:
+      - "8080:8080"
